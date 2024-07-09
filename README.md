@@ -180,14 +180,16 @@ pipeline {
         }
         stage('Checkout from Git') {
             steps {
-                git branch: 'main', url: 'https://github.com/Aakibgithuber/Deploy-Netflix-Clone-on-Kubernetes.git'
+                git branch: 'main', url: 'https://github.com/VKK07/Netflix.git'
             }
         }
         stage("Sonarqube Analysis") {
             steps {
                 withSonarQubeEnv('sonar-server') {
-                    sh '''$SCANNER_HOME/bin/sonar-scanner -Dsonar.projectName=Netflix \
-                    -Dsonar.projectKey=Netflix'''
+                    sh '''
+                      $SCANNER_HOME/bin/sonar-scanner -Dsonar.projectName=Netflix \
+                      -Dsonar.projectKey=Netflix
+                   '''
                 }
             }
         }
@@ -203,9 +205,47 @@ pipeline {
                 sh "npm install"
             }
         }
-    }
+        stage('OWASP FS Scan') { 
+            steps { 
+                dependencyCheck additionalArguments: '--scan ./ --disableYarnAudit --disableNodeAudit', odcInstallation: 'DP-Check' 
+                dependencyCheckPublisher pattern: '**/dependency-check-report.xml' 
+            } 
+        } 
+
+        stage('Trivy FS Scan') { 
+            steps { 
+                sh 'trivy fs . > trivyfs.txt' 
+            } 
+        } 
+
+        stage('Docker Build & Push') { 
+            steps { 
+                script { 
+                    withDockerRegistry(credentialsId: 'docker', toolName: 'docker') { 
+                        sh ''' 
+                            docker build --build-arg TMDB_V3_API_KEY=a56e89d51ca317384bda1a36702ca062 -t netflix:latest . 
+                            docker tag netflix kirankumarv7/netflix:latest 
+                            docker push kirankumarv7/netflix:latest 
+                        ''' 
+                    } 
+                } 
+            } 
+        } 
+
+        stage('Trivy') { 
+            steps { 
+                sh 'trivy image kirankumarv7/netflix:latest > trivyimage.txt' 
+            } 
+        } 
+
+        stage('Deploy to Container') { 
+            steps { 
+                sh 'docker run -d --name netflix -p 8081:80 kirankumarv7/netflix:latest' 
+            } 
+        } 
+
+    } 
 }
-```
 
 Certainly, here are the instructions without step numbers:
 
